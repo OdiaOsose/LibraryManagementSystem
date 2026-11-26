@@ -1,2 +1,20 @@
-﻿// See https://aka.ms/new-console-template for more information
-Console.WriteLine("Hello, World!");
+﻿using System;
+
+namespace LibraryManagementSystem
+{
+    class Program
+    {
+        // The program starts here.
+        static void Main()
+        {
+            // Build the layers and connect them. "new" creates an object from a class.
+            BookRepository books = new BookRepository();              // data: books.txt
+            BorrowerRepository borrowers = new BorrowerRepository();  // data: borrowers.txt
+            InputValidator validator = new InputValidator();          // services: input rules
+            LibraryService service = new LibraryService(books, borrowers);  // services: library rules
+            ConsoleUI ui = new ConsoleUI(service, validator);         // presentation
+
+            ui.Run();   // start the menu
+        }
+    }
+}

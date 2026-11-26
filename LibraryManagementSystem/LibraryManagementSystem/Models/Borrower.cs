@@ -1,12 +1,19 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace LibraryManagementSystem.Models
+namespace LibraryManagementSystem
 {
-    internal class Borrower
+    // MODEL: one registered library member who can borrow books.
+    public class Borrower
     {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public string Phone { get; set; }
+
+        public Borrower(int id, string name, string phone)
+        {
+            Id = id;
+            Name = name;
+            Phone = phone;
+        }
     }
 }
