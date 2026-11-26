@@ -5,7 +5,6 @@ namespace LibraryManagementSystem
 {
     // PRESENTATION LAYER: the ONLY class that prints to the screen or reads the keyboard.
     // At any question the user can type BACK to cancel and return to the menu.
-    // Increment 2: books, borrowers, issuing and returning books.
     public class ConsoleUI
     {
         private LibraryService service;
@@ -49,7 +48,7 @@ namespace LibraryManagementSystem
             Console.WriteLine("4. View all borrowers");
             Console.WriteLine("5. Issue a book");
             Console.WriteLine("6. Return a book");
-            Console.WriteLine("7. View books currently on loan");
+            Console.WriteLine("7. View books currently on loan (and overdue charges)");
             Console.WriteLine("0. Exit");
         }
 
@@ -170,6 +169,30 @@ namespace LibraryManagementSystem
             }
         }
 
+        // Asks for the return date. Pressing Enter means today.
+        private bool AskReturnDate(out DateTime date)
+        {
+            while (true)
+            {
+                string text = ReadText("Return date as yyyy-MM-dd (press Enter for today): ");
+                if (text.ToUpper() == "BACK")
+                {
+                    date = DateTime.Today;
+                    return false;
+                }
+                if (text == "")
+                {
+                    date = DateTime.Today;
+                    return true;
+                }
+                if (validator.TryParseDate(text, out date))
+                {
+                    return true;
+                }
+                Console.WriteLine("Invalid date. Use the form yyyy-MM-dd, for example 2026-12-01.");
+            }
+        }
+
         // ---------- menu actions ----------
 
         private void AddBook()
@@ -249,7 +272,7 @@ namespace LibraryManagementSystem
 
             Loan loan = service.IssueBook(bookId, borrowerId);
             Console.WriteLine("Book issued. Loan ID: " + loan.LoanId);
-            Console.WriteLine("Due date: " + DateHelper.Format(loan.DueDate));
+            Console.WriteLine("Due date: " + DateHelper.Format(loan.DueDate) + " (fine of " + LibraryService.FinePerDay.ToString("N2") + " NGN per day after that)");
         }
 
         private void ReturnBook()
@@ -257,16 +280,27 @@ namespace LibraryManagementSystem
             Console.WriteLine("(Type BACK at any question to return to the menu.)");
             int loanId;
             if (!AskId("Loan ID: ", out loanId)) { return; }
+            DateTime returnDate;
+            if (!AskReturnDate(out returnDate)) { return; }
 
-            string problem = service.CheckReturn(loanId);
+            string problem = service.CheckReturn(loanId, returnDate);
             if (problem != "")
             {
                 Console.WriteLine("Cannot return: " + problem);
                 return;
             }
 
-            Loan loan = service.ReturnBook(loanId);
+            Loan loan = service.ReturnBook(loanId, returnDate);
             Console.WriteLine("Book returned on " + DateHelper.Format(loan.ReturnDate) + ".");
+            if (loan.Fine > 0)
+            {
+                int daysLate = (loan.ReturnDate - loan.DueDate).Days;
+                Console.WriteLine("OVERDUE by " + daysLate + " day(s). Fine to pay: " + loan.Fine.ToString("N2") + " NGN");
+            }
+            else
+            {
+                Console.WriteLine("Returned on time. No fine.");
+            }
         }
 
         private void ShowActiveLoans()
@@ -279,11 +313,18 @@ namespace LibraryManagementSystem
                 return;
             }
 
-            Console.WriteLine("Books currently on loan:");
+            Console.WriteLine("Books currently on loan (as of " + DateHelper.Format(DateTime.Today) + "):");
             foreach (Loan l in list)
             {
+                int overdue = service.GetDaysOverdue(l, DateTime.Today);
+                string status = "on time";
+                if (overdue > 0)
+                {
+                    decimal fineSoFar = service.CalculateFine(l.DueDate, DateTime.Today);
+                    status = "OVERDUE " + overdue + " day(s), fine so far " + fineSoFar.ToString("N2") + " NGN";
+                }
                 Console.WriteLine($"  Loan {l.LoanId}: '{service.GetBookTitle(l.BookId)}' to {service.GetBorrowerName(l.BorrowerId)}, "
-                    + $"issued {DateHelper.Format(l.IssueDate)}, due {DateHelper.Format(l.DueDate)}");
+                    + $"issued {DateHelper.Format(l.IssueDate)}, due {DateHelper.Format(l.DueDate)} - {status}");
             }
         }
     }

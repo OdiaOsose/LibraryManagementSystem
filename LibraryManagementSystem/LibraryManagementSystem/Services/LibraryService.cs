@@ -3,11 +3,12 @@ using System.Collections.Generic;
 
 namespace LibraryManagementSystem
 {
-    // SERVICES (BUSINESS) LAYER: the "brain". It never prints and never reads the keyboard.
-    // Increment 2: books and borrowers + issuing and returning books.
+    // SERVICES (BUSINESS) LAYER: the "brain". It holds the library rules (loan length, fines, limits).
+    // It never prints and never reads the keyboard.
     public class LibraryService
     {
         public const int LoanDays = 14;          // a book may be kept 14 days
+        public const decimal FinePerDay = 50m;   // overdue charge per late day (NGN); "m" marks a decimal number
         public const int MaxActiveLoans = 3;     // a borrower may have at most 3 books out
 
         private BookRepository books;
@@ -83,7 +84,7 @@ namespace LibraryManagementSystem
         // ---- Returning ----
 
         // Returns "" if the return is allowed, otherwise a message saying why not.
-        public string CheckReturn(int loanId)
+        public string CheckReturn(int loanId, DateTime returnDate)
         {
             if (!loans.HasLoan(loanId))
             {
@@ -94,15 +95,30 @@ namespace LibraryManagementSystem
             {
                 return "Loan " + loanId + " has already been returned.";
             }
+            if (returnDate < loan.IssueDate)
+            {
+                return "The return date cannot be before the issue date (" + DateHelper.Format(loan.IssueDate) + ").";
+            }
             return "";
         }
 
-        // Completes the return today and puts the copy back on the shelf. Call CheckReturn first.
-        // (Overdue charges are added in Increment 3, so the fine is 0 for now.)
-        public Loan ReturnBook(int loanId)
+        // Fine = days late x fine per day. No fine if returned on or before the due date.
+        public decimal CalculateFine(DateTime dueDate, DateTime returnDate)
+        {
+            int daysLate = (returnDate - dueDate).Days;   // subtracting two dates gives a time span; .Days is the number of days
+            if (daysLate <= 0)
+            {
+                return 0m;
+            }
+            return daysLate * FinePerDay;
+        }
+
+        // Completes the return: stores the date and fine, and puts the copy back on the shelf. Call CheckReturn first.
+        public Loan ReturnBook(int loanId, DateTime returnDate)
         {
             Loan loan = loans.GetById(loanId);
-            loans.Complete(loanId, DateTime.Today, 0m);   // 0m = a decimal zero
+            decimal fine = CalculateFine(loan.DueDate, returnDate);
+            loans.Complete(loanId, returnDate, fine);
             books.ChangeAvailable(loan.BookId, 1);
             return loans.GetById(loanId);
         }
@@ -112,6 +128,17 @@ namespace LibraryManagementSystem
         public List<Loan> GetActiveLoans()
         {
             return loans.GetActive();
+        }
+
+        // How many days late is this loan as of the given date? 0 if not late.
+        public int GetDaysOverdue(Loan loan, DateTime asOf)
+        {
+            int days = (asOf - loan.DueDate).Days;
+            if (days < 0)
+            {
+                return 0;
+            }
+            return days;
         }
 
         public string GetBookTitle(int bookId)

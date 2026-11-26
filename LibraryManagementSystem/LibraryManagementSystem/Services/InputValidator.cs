@@ -30,7 +30,7 @@ namespace LibraryManagementSystem
             return true;
         }
 
-        // Can the text be read as a whole number greater than 0? The number goes into "number".
+        // Can the text be read as a whole number greater than 0 (e.g. an ID)? The number goes into "number".
         public bool TryParsePositiveInt(string text, out int number)
         {
             return int.TryParse(text, out number) && number > 0;
@@ -57,6 +57,12 @@ namespace LibraryManagementSystem
                 }
             }
             return true;
+        }
+
+        // Is the text a real date written as yyyy-MM-dd?
+        public bool TryParseDate(string text, out DateTime date)
+        {
+            return DateHelper.TryParse(text, out date);
         }
     }
 }
