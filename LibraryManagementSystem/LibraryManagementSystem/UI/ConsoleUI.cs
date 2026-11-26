@@ -5,7 +5,7 @@ namespace LibraryManagementSystem
 {
     // PRESENTATION LAYER: the ONLY class that prints to the screen or reads the keyboard.
     // At any question the user can type BACK to cancel and return to the menu.
-    // Increment 1: add/view books, register/view borrowers.
+    // Increment 2: books, borrowers, issuing and returning books.
     public class ConsoleUI
     {
         private LibraryService service;
@@ -30,6 +30,9 @@ namespace LibraryManagementSystem
                 else if (choice == "2") { ShowBooks(); }
                 else if (choice == "3") { RegisterBorrower(); }
                 else if (choice == "4") { ShowBorrowers(); }
+                else if (choice == "5") { IssueBook(); }
+                else if (choice == "6") { ReturnBook(); }
+                else if (choice == "7") { ShowActiveLoans(); }
                 else if (choice == "0") { running = false; }
                 else { Console.WriteLine("Invalid choice. Please enter a number from the menu."); }
             }
@@ -44,6 +47,9 @@ namespace LibraryManagementSystem
             Console.WriteLine("2. View all books and availability");
             Console.WriteLine("3. Register a borrower");
             Console.WriteLine("4. View all borrowers");
+            Console.WriteLine("5. Issue a book");
+            Console.WriteLine("6. Return a book");
+            Console.WriteLine("7. View books currently on loan");
             Console.WriteLine("0. Exit");
         }
 
@@ -98,6 +104,25 @@ namespace LibraryManagementSystem
                     return true;
                 }
                 Console.WriteLine("Names can only contain letters, spaces, hyphens, apostrophes and full stops.");
+            }
+        }
+
+        // Keeps asking until the user types a whole number above 0. Returns false on BACK.
+        private bool AskId(string question, out int number)
+        {
+            while (true)
+            {
+                string text = ReadText(question);
+                if (text.ToUpper() == "BACK")
+                {
+                    number = 0;
+                    return false;
+                }
+                if (validator.TryParsePositiveInt(text, out number))
+                {
+                    return true;
+                }
+                Console.WriteLine("Please enter a whole number greater than 0.");
             }
         }
 
@@ -204,6 +229,61 @@ namespace LibraryManagementSystem
             foreach (Borrower b in list)
             {
                 Console.WriteLine($"{b.Id,-5}{b.Name,-30}{b.Phone,-16}");
+            }
+        }
+
+        private void IssueBook()
+        {
+            Console.WriteLine("(Type BACK at any question to return to the menu.)");
+            int bookId;
+            if (!AskId("Book ID: ", out bookId)) { return; }
+            int borrowerId;
+            if (!AskId("Borrower ID: ", out borrowerId)) { return; }
+
+            string problem = service.CheckIssue(bookId, borrowerId);
+            if (problem != "")
+            {
+                Console.WriteLine("Cannot issue: " + problem);
+                return;
+            }
+
+            Loan loan = service.IssueBook(bookId, borrowerId);
+            Console.WriteLine("Book issued. Loan ID: " + loan.LoanId);
+            Console.WriteLine("Due date: " + DateHelper.Format(loan.DueDate));
+        }
+
+        private void ReturnBook()
+        {
+            Console.WriteLine("(Type BACK at any question to return to the menu.)");
+            int loanId;
+            if (!AskId("Loan ID: ", out loanId)) { return; }
+
+            string problem = service.CheckReturn(loanId);
+            if (problem != "")
+            {
+                Console.WriteLine("Cannot return: " + problem);
+                return;
+            }
+
+            Loan loan = service.ReturnBook(loanId);
+            Console.WriteLine("Book returned on " + DateHelper.Format(loan.ReturnDate) + ".");
+        }
+
+        private void ShowActiveLoans()
+        {
+            List<Loan> list = service.GetActiveLoans();
+            Console.WriteLine();
+            if (list.Count == 0)
+            {
+                Console.WriteLine("No books are currently on loan.");
+                return;
+            }
+
+            Console.WriteLine("Books currently on loan:");
+            foreach (Loan l in list)
+            {
+                Console.WriteLine($"  Loan {l.LoanId}: '{service.GetBookTitle(l.BookId)}' to {service.GetBorrowerName(l.BorrowerId)}, "
+                    + $"issued {DateHelper.Format(l.IssueDate)}, due {DateHelper.Format(l.DueDate)}");
             }
         }
     }
